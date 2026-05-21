@@ -4,18 +4,18 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>관리감독자 업무 점검</title>
-<link rel="manifest" href="manifest.json">
+<link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#f5a623">
 
 <!-- Apple PWA 필수 설정 -->
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="안전점검">
-<link rel="apple-touch-icon" href="icon-192.png">
-<link rel="apple-touch-icon" sizes="72x72" href="icon-72.png">
-<link rel="apple-touch-icon" sizes="192x192" href="icon-192.png">
-<link rel="apple-touch-icon" sizes="512x512" href="icon-512.png">
-<link rel="apple-touch-startup-image" href="icon-512.png">
+<link rel="apple-touch-icon" href="/icon-192.png">
+<link rel="apple-touch-icon" sizes="72x72" href="/icon-72.png">
+<link rel="apple-touch-icon" sizes="192x192" href="/icon-192.png">
+<link rel="apple-touch-icon" sizes="512x512" href="/icon-512.png">
+<link rel="apple-touch-startup-image" href="/icon-512.png">
 
 <!-- 모바일 -->
 <meta name="mobile-web-app-capable" content="yes">
@@ -621,9 +621,12 @@ function renderM2LocList(){
           ${isDone?'구글폼 제출 완료':'현장 QR코드를 카메라로 스캔하세요'}
         </div>
       </div>
-      <div style="font-size:12px;font-weight:700;color:${isDone?'var(--green)':'#a78bfa'};">
-        ${isDone?'완료':'미완료'}
-      </div>
+      ${!isDone ? `
+      <button onclick="goStep(3);setTimeout(()=>switchTab('qr'),100);"
+        style="background:linear-gradient(135deg,#7c3aed,#3b82f6);border:none;border-radius:8px;padding:8px 14px;color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;white-space:nowrap;">
+        📷 카메라
+      </button>` : `
+      <div style="font-size:12px;font-weight:700;color:var(--green);">완료</div>`}
     </div>`;
   }).join('');
 }
@@ -976,16 +979,7 @@ function showResult(okC,partC,ngC,naC,emails,success){
 }
 
 // ── 리마인더 ─────────────────────────────────────────────────────────
-function startReminder(){
-  stopReminder();
-  reminderTimer=setInterval(()=>{
-    if(state.submitted) return;
-    const allItems=[...COMMON_ITEMS,...(TURN_ITEMS[state.turn]||[])];
-    const remain=allItems.filter(i=>!state.checks[i.id]).length;
-    if(remain>0) alert(`⚠️ 점검 미완료\n\n아직 ${remain}개 항목이 체크되지 않았습니다.`);
-    else confirm('✅ 모든 항목 완료!\n\n결과를 제출하시겠습니까?')&&goStep(4);
-  },30000);
-}
+function startReminder(){ stopReminder(); }
 function stopReminder(){if(reminderTimer){clearInterval(reminderTimer);reminderTimer=null;}}
 window.addEventListener('beforeunload',e=>{if(state.turn&&!state.submitted){e.preventDefault();e.returnValue='점검이 완료되지 않았습니다.';}});
 
@@ -1009,7 +1003,7 @@ function resetAll(){
 let swReg=null;
 async function initPWA(){
   if('serviceWorker' in navigator){
-    try{ swReg=await navigator.serviceWorker.register('service-worker.js'); }catch(e){}
+    try{ swReg=await navigator.serviceWorker.register('/service-worker.js', {scope: '/'}); }catch(e){ console.warn('SW 등록 실패:',e); }
   }
   if('Notification' in window){
     if(Notification.permission==='default'){
