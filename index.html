@@ -277,17 +277,25 @@ body{background:var(--bg);color:var(--text);font-family:'Noto Sans KR',sans-seri
       <div class="info-box" style="margin-bottom:12px;"><span>📍</span><span>중2층 각 위치의 QR코드를 스캔하고 구글폼을 작성해주세요.</span></div>
       <div id="m2LocList"></div>
 
-      <!-- QR 스캐너 -->
-      <div class="qr-box" id="qrScanBox2" style="margin-top:14px;">
-        <div class="qr-icon">📷</div>
-        <div class="qr-title">QR 스캔 시작</div>
-        <div class="qr-sub">아래 버튼을 눌러 카메라로<br>QR코드를 스캔하세요.</div>
+    <!-- 중2층 QR 탭 -->
+    <div id="tab2Content-qr" style="display:none;">
+      <div class="info-box" style="margin-bottom:12px;"><span>📍</span><span>각 위치의 QR코드를 스캔하면 구글폼이 자동으로 열립니다.</span></div>
+      <div id="m2LocList"></div>
+
+      <!-- 카메라 뷰 (위치 선택 시 표시) -->
+      <div id="m2CameraWrap" style="display:none;margin-top:14px;">
+        <div style="font-size:13px;font-weight:700;color:#a78bfa;margin-bottom:8px;" id="m2CameraLabel">📷 스캔 중...</div>
+        <div style="position:relative;width:100%;border-radius:12px;overflow:hidden;background:#000;">
+          <video id="qr-video2" autoplay muted playsinline style="width:100%;display:block;border-radius:12px;"></video>
+          <div style="position:absolute;inset:0;pointer-events:none;">
+            <div style="position:absolute;top:10px;left:10px;width:24px;height:24px;border-top:3px solid #a78bfa;border-left:3px solid #a78bfa;border-radius:2px;"></div>
+            <div style="position:absolute;top:10px;right:10px;width:24px;height:24px;border-top:3px solid #a78bfa;border-right:3px solid #a78bfa;border-radius:2px;"></div>
+            <div style="position:absolute;bottom:10px;left:10px;width:24px;height:24px;border-bottom:3px solid #a78bfa;border-left:3px solid #a78bfa;border-radius:2px;"></div>
+            <div style="position:absolute;bottom:10px;right:10px;width:24px;height:24px;border-bottom:3px solid #a78bfa;border-right:3px solid #a78bfa;border-radius:2px;"></div>
+          </div>
+        </div>
+        <button onclick="stopInlineQRScan2()" class="btn btn-ghost" style="margin-top:8px;">■ 스캔 중지</button>
       </div>
-      <div id="qr-video-wrap2" style="display:none;">
-        <video id="qr-video2" autoplay muted playsinline style="width:100%;border-radius:12px;display:block;"></video>
-      </div>
-      <button class="btn btn-qr" id="qrStartBtn2" onclick="startInlineQRScan2()">📷 QR 스캔 시작</button>
-      <button class="btn btn-ghost" id="qrStopBtn2" style="display:none;" onclick="stopInlineQRScan2()">■ 스캔 중지</button>
 
       <!-- 완료 목록 -->
       <div style="margin-top:16px;">
@@ -651,19 +659,17 @@ function renderM2LocList(){
   el.innerHTML=m2Locs.map(loc=>{
     const isDone=state.qrFormDone.has(loc.id);
     return `
-    <div style="display:flex;align-items:center;gap:12px;padding:12px 14px;background:var(--surface2);border:1px solid ${isDone?'var(--green)':'var(--border)'};border-radius:10px;margin-bottom:8px;transition:all 0.2s;">
+    <div style="display:flex;align-items:center;gap:12px;padding:12px 14px;background:var(--surface2);border:1px solid ${isDone?'var(--green)':'var(--border)'};border-radius:10px;margin-bottom:8px;">
       <span style="font-size:22px;">${isDone?'✅':'📷'}</span>
       <div style="flex:1;">
         <div style="font-size:14px;font-weight:600;color:${isDone?'var(--green)':'var(--text)'};">${loc.name}</div>
-        <div style="font-size:11px;color:${isDone?'var(--green)':'var(--text2)'};">
-          ${isDone?'구글폼 제출 완료':'QR 스캔 후 구글폼 작성'}
-        </div>
+        <div style="font-size:11px;color:${isDone?'var(--green)':'var(--text2)'};">${isDone?'구글폼 제출 완료':'QR 스캔 → 카메라 자동 실행'}</div>
       </div>
       ${isDone
-        ? `<div style="font-size:12px;font-weight:700;color:var(--green);">완료</div>`
-        : `<button onclick="showFormModal(QR_LOCATIONS.find(l=>l.id==='${loc.id}'))"
+        ? '<div style="font-size:12px;font-weight:700;color:var(--green);">완료</div>'
+        : `<button onclick="startInlineQRScan2('${loc.id}')"
             style="background:linear-gradient(135deg,#7c3aed,#3b82f6);border:none;border-radius:8px;padding:8px 12px;color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;white-space:nowrap;">
-            📋 폼 작성
+            📷 스캔
           </button>`
       }
     </div>`;
@@ -777,67 +783,101 @@ function switchTab2(tab){
 }
 let inlineStream2 = null;
 let inlineFrame2 = null;
+let currentScanLocId = null;
 
-async function startInlineQRScan2(){
+async function startInlineQRScan2(locId){
+  currentScanLocId = locId;
+  const loc = QR_LOCATIONS.find(l=>l.id===locId);
+  const wrap = document.getElementById('m2CameraWrap');
+  const label = document.getElementById('m2CameraLabel');
+  if(wrap) wrap.style.display='block';
+  if(label && loc) label.textContent=`📷 ${loc.name} 스캔 중...`;
+  if(inlineStream2) inlineStream2.getTracks().forEach(t=>t.stop());
+  if(inlineFrame2) cancelAnimationFrame(inlineFrame2);
   try{
-    inlineStream2 = await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});
+    inlineStream2 = await navigator.mediaDevices.getUserMedia({
+      video:{ facingMode:'environment', width:{ideal:1280}, height:{ideal:720} }
+    });
     const video = document.getElementById('qr-video2');
     video.srcObject = inlineStream2;
-    document.getElementById('qr-video-wrap2').style.display='block';
-    document.getElementById('qrScanBox2').style.display='none';
-    document.getElementById('qrStartBtn2').style.display='none';
-    document.getElementById('qrStopBtn2').style.display='block';
-    video.addEventListener('loadeddata', ()=>{ inlineFrame2=requestAnimationFrame(scanInlineFrame2); });
+    video.onloadeddata = () => { inlineFrame2 = requestAnimationFrame(scanInlineFrame2); };
+    await video.play().catch(()=>{});
   }catch(e){
-    alert('카메라 접근 권한이 필요합니다.');
+    alert('카메라 권한이 필요합니다. 설정에서 카메라 권한을 허용해주세요.');
+    stopInlineQRScan2();
   }
 }
 
 function stopInlineQRScan2(){
   if(inlineStream2) inlineStream2.getTracks().forEach(t=>t.stop());
   if(inlineFrame2) cancelAnimationFrame(inlineFrame2);
-  inlineStream2=null; inlineFrame2=null;
-  const wrap=document.getElementById('qr-video-wrap2');
-  const box=document.getElementById('qrScanBox2');
-  const startBtn=document.getElementById('qrStartBtn2');
-  const stopBtn=document.getElementById('qrStopBtn2');
+  inlineStream2=null; inlineFrame2=null; currentScanLocId=null;
+  const wrap=document.getElementById('m2CameraWrap');
   if(wrap) wrap.style.display='none';
-  if(box) box.style.display='block';
-  if(startBtn) startBtn.style.display='block';
-  if(stopBtn) stopBtn.style.display='none';
 }
 
 function scanInlineFrame2(){
-  const video = document.getElementById('qr-video2');
-  if(!video){ stopInlineQRScan2(); return; }
-  if(video.readyState === video.HAVE_ENOUGH_DATA){
-    const canvas = document.createElement('canvas');
-    canvas.width=video.videoWidth; canvas.height=video.videoHeight;
+  const video=document.getElementById('qr-video2');
+  if(!video||!inlineStream2){ stopInlineQRScan2(); return; }
+  if(video.readyState===video.HAVE_ENOUGH_DATA && video.videoWidth>0){
+    const canvas=document.createElement('canvas');
+    canvas.width=video.videoWidth;
+    canvas.height=video.videoHeight;
     const ctx=canvas.getContext('2d');
     ctx.drawImage(video,0,0,canvas.width,canvas.height);
-    const imgData=ctx.getImageData(0,0,canvas.width,canvas.height);
-    const code=jsQR(imgData.data,imgData.width,imgData.height,{inversionAttempts:'dontInvert'});
-    if(code){
-      stopInlineQRScan2();
-      const scanned=code.data.trim();
-      // 구글폼 URL 인식
-      if(scanned.includes('docs.google.com/forms')){
-        const cleanUrl=scanned.split('?')[0];
-        const matched=QR_LOCATIONS.find(l=>l.formUrl && l.formUrl.split('?')[0]===cleanUrl);
-        if(matched){ showFormModal(matched); return; }
-        window.open(scanned,'_blank'); return;
+    try{
+      const imgData=ctx.getImageData(0,0,canvas.width,canvas.height);
+      const code=jsQR(imgData.data,imgData.width,imgData.height,{inversionAttempts:'dontInvert'});
+      if(code){
+        stopInlineQRScan2();
+        const scanned=code.data.trim();
+        if(scanned.includes('docs.google.com/forms')){
+          const cleanUrl=scanned.split('?')[0];
+          const matched=QR_LOCATIONS.find(l=>l.formUrl&&l.formUrl.split('?')[0]===cleanUrl);
+          if(matched){ showFormModal(matched); return; }
+          window.open(scanned,'_blank');
+          if(currentScanLocId) showFormConfirm(currentScanLocId, scanned);
+          return;
+        }
+        let locId=null;
+        try{ locId=new URL(scanned).searchParams.get('loc'); }catch(_){}
+        if(!locId) locId=scanned;
+        const found=QR_LOCATIONS.find(l=>l.id===locId);
+        if(found) completeQRAuth(found.id);
+        else alert('⚠️ 등록되지 않은 QR코드입니다.');
+        return;
       }
-      // loc ID 방식
-      let locId=null;
-      try{ locId=new URL(scanned).searchParams.get('loc'); }catch(_){}
-      if(!locId) locId=scanned;
-      const found=QR_LOCATIONS.find(l=>l.id===locId);
-      if(found) completeQRAuth(found.id);
-      else alert('⚠️ 등록되지 않은 QR코드입니다.');
-      return;
-    }
+    }catch(e){}
   }
   inlineFrame2=requestAnimationFrame(scanInlineFrame2);
+}
+
+function showFormConfirm(locId, formUrl){
+  const loc=QR_LOCATIONS.find(l=>l.id===locId);
+  const old=document.getElementById('formConfirmModal');
+  if(old) old.remove();
+  const modal=document.createElement('div');
+  modal.id='formConfirmModal';
+  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:300;display:flex;align-items:flex-end;';
+  modal.innerHTML=`
+    <div style="background:#111418;border-radius:20px 20px 0 0;padding:24px 24px 36px;width:100%;border-top:1px solid #2a3340;">
+      <div style="width:40px;height:4px;background:#2a3340;border-radius:2px;margin:0 auto 18px;"></div>
+      <div style="font-size:17px;font-weight:700;margin-bottom:6px;">📋 ${loc?loc.name:''}</div>
+      <div style="font-size:13px;color:#8fa0b0;margin-bottom:20px;line-height:1.6;">구글폼이 열렸습니다.<br>폼을 작성하고 제출한 뒤 아래 버튼을 눌러주세요.</div>
+      <button onclick="window.open('${formUrl}','_blank')"
+        style="width:100%;background:rgba(139,92,246,0.2);border:1px solid #7c3aed;border-radius:12px;padding:13px;color:#a78bfa;font-size:14px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;margin-bottom:10px;">
+        📋 폼 다시 열기
+      </button>
+      <button onclick="completeQRAuth('${locId}');document.getElementById('formConfirmModal').remove();"
+        style="width:100%;background:linear-gradient(135deg,#f5a623,#e8431a);border:none;border-radius:12px;padding:15px;color:#fff;font-size:15px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;margin-bottom:10px;">
+        ✅ 폼 제출 완료
+      </button>
+      <button onclick="document.getElementById('formConfirmModal').remove();"
+        style="width:100%;background:transparent;border:1px solid #2a3340;border-radius:12px;padding:12px;color:#8fa0b0;font-size:13px;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">
+        취소
+      </button>
+    </div>`;
+  document.body.appendChild(modal);
 }
 
 // m2DoneList 업데이트
