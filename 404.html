@@ -365,7 +365,7 @@ body{background:var(--bg);color:var(--text);font-family:'Noto Sans KR',sans-seri
       <div id="emailList" style="font-size:11px;color:var(--text2);font-family:'JetBrains Mono',monospace;line-height:2;"></div>
     </div>
     <button class="btn btn-ghost" onclick="goStep(3)">← 수정</button>
-    <button class="btn btn-primary" onclick="submitResult()">📤 제출 및 이메일 발송</button>
+    <button class="btn btn-primary" onclick="submitResult()">📤 점검 결과 제출</button>
   </div>
 </div>
 
@@ -376,11 +376,57 @@ body{background:var(--bg);color:var(--text);font-family:'Noto Sans KR',sans-seri
     <div style="font-size:19px;font-weight:700;margin-bottom:8px;">점검 완료</div>
     <div style="font-size:13px;color:var(--text2);margin-bottom:20px;" id="resultSub"></div>
     <div id="resultStats"></div>
-    <div style="margin-top:18px;padding:14px;background:var(--surface2);border-radius:10px;text-align:left;">
-      <div class="card-label" style="margin-bottom:6px;">발송 내역</div>
-      <div id="emailSentList" style="font-size:11px;color:var(--text2);font-family:'JetBrains Mono',monospace;line-height:2;"></div>
+    <button class="btn btn-primary" style="margin-top:16px;" onclick="showDashboard()">📊 점검 결과 대시보드</button>
+    <button class="btn btn-ghost" style="margin-top:8px;" onclick="resetAll()">🔄 새 점검 시작</button>
+  </div>
+</div>
+
+<!-- ── 대시보드 ── -->
+<div class="step-screen" id="stepDash">
+  <div class="card">
+    <div class="card-label">점검 결과 대시보드</div>
+    <div class="card-title">현황 분석</div>
+
+    <!-- 기간 설정 -->
+    <div style="background:var(--surface2);border-radius:12px;padding:14px;margin-bottom:16px;">
+      <div class="sec-title" style="margin-top:0;">기간 설정</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
+        <div>
+          <div style="font-size:11px;color:var(--text2);margin-bottom:4px;">시작일</div>
+          <input type="date" id="dashStart" style="width:100%;background:var(--surface3);border:1px solid var(--border);border-radius:8px;padding:8px;color:var(--text);font-size:13px;">
+        </div>
+        <div>
+          <div style="font-size:11px;color:var(--text2);margin-bottom:4px;">종료일</div>
+          <input type="date" id="dashEnd" style="width:100%;background:var(--surface3);border:1px solid var(--border);border-radius:8px;padding:8px;color:var(--text);font-size:13px;">
+        </div>
+      </div>
+      <button onclick="loadDashboard()" class="btn btn-primary" style="margin-top:0;">🔍 조회</button>
     </div>
-    <button class="btn btn-primary" style="margin-top:16px;" onclick="resetAll()">🔄 새 점검 시작</button>
+
+    <!-- 로딩 -->
+    <div id="dashLoading" style="display:none;text-align:center;padding:20px;color:var(--text2);">데이터 불러오는 중...</div>
+
+    <!-- 결과 -->
+    <div id="dashContent" style="display:none;">
+
+      <!-- 오늘 점검 참여조 -->
+      <div class="sec-title">오늘 점검 참여조</div>
+      <div id="dashTodayShift" style="margin-bottom:16px;"></div>
+
+      <!-- 조별 참여 횟수 -->
+      <div class="sec-title">기간 내 조별 참여 횟수</div>
+      <div id="dashShiftCount" style="margin-bottom:16px;"></div>
+
+      <!-- 보완·불량 항목 -->
+      <div class="sec-title">기간 내 보완·불량 항목</div>
+      <div id="dashNgItems" style="margin-bottom:16px;"></div>
+
+      <!-- 특이사항 -->
+      <div class="sec-title">기간 내 특이사항</div>
+      <div id="dashMemo" style="margin-bottom:16px;"></div>
+    </div>
+
+    <button class="btn btn-ghost" onclick="goStep(5)">← 돌아가기</button>
   </div>
 </div>
 
@@ -1287,7 +1333,6 @@ async function submitResult(){
   const partC=allItems.filter(i=>state.checks[i.id]==='partial').length;
   const ngC=allItems.filter(i=>state.checks[i.id]==='ng').length;
   const naC=allItems.filter(i=>state.checks[i.id]==='na').length;
-  const emails=EMAIL_MAP[state.shift]||[];
   const tLabel={'전':'오전','후':'오후','야':'야간'}[state.turn]||state.turn;
   const qrList=[...state.qrDone].map(id=>{const l=QR_LOCATIONS.find(x=>x.id===id);return l?`${l.floor}-${l.name}`:id;}).join(' / ');
   const ngDetail=ngItems.map((item,i)=>{
@@ -1295,50 +1340,27 @@ async function submitResult(){
     return `${i+1}. [${sym}] ${item.text}\n   → 조치: ${state.ngMemos[item.id]||'(미입력)'}`;
   }).join('\n');
 
-  const emailBody=`
-=== 관리감독자 업무 점검 결과 ===
-▶ 점검 일시  : ${state.timestamp}
-▶ 근무조     : ${state.shift}조
-▶ 교대 구분  : ${tLabel}
-▶ 점검 구역  : ${state.todayFloor}
-▶ QR 인증    : ${qrList||'없음'}
-${state.qrFormDone.size>0?`▶ 중2층 구글폼: ${m2FormList} 제출 완료\n   (각 위치별 상세 응답은 구글폼 응답지를 확인하세요)`:''}
---- 점검 결과 ---
-○ 양호    : ${okC}건
-△ 보완    : ${partC}건
-X 불량    : ${ngC}건
-- 해당없음 : ${naC}건
-${ngItems.length>0?`--- 부적합·보완 항목 ---\n${ngDetail}`:'--- 부적합 항목 없음 ✅ ---'}
---- 기타 사항 ---
-${state.memo||'없음'}`.trim();
-
   const payload={
     timestamp:state.timestamp, shift:state.shift, turn:tLabel,
     floor:state.todayFloor, qrLocations:qrList||'없음',
-    m2FormLocations:m2FormList||'없음',
     gps:`${state.gpsLat}, ${state.gpsLng}`, accuracy:state.gpsAccuracy||'N/A',
     ok:okC, partial:partC, ng:ngC, na:naC,
     checks:state.checks,
     ngDetail:ngDetail||'없음', memo:state.memo||'없음',
-    toEmails:emails.join(','),
-    subject:`[안전패트롤] ${state.shift}조 ${tLabel} 점검결과 - ${state.timestamp}`,
-    emailBody:emailBody,
   };
 
-  // 요청만 보내고 기다리지 않음 (no-cors라 응답 못 받음)
   fetch(APPS_SCRIPT_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
-    .catch(()=>{}); // 에러 무시
+    .catch(()=>{});
 
   overlay.classList.remove('show');
   state.submitted=true; stopReminder();
-  showResult(okC,partC,ngC,naC,emails,true);
+  showResult(okC,partC,ngC,naC,true);
 }
 
-function showResult(okC,partC,ngC,naC,emails,success){
+function showResult(okC,partC,ngC,naC,success){
   goStep(5);
-  document.getElementById('resultIcon').textContent=success?'✅':'⚠️';
-  document.getElementById('resultSub').textContent=
-    success?`구글 시트 기록 완료 · ${state.shift}조 ${emails.length}명에게 이메일 발송`:'저장 시도 완료 (네트워크 상태 확인)';
+  document.getElementById('resultIcon').textContent='✅';
+  document.getElementById('resultSub').textContent=`${state.shift}조 점검 완료 · 구글 시트에 저장됐습니다.`;
   document.getElementById('resultStats').innerHTML=`
     <div class="stat-chips">
       <div class="stat-chip chip-ok">○ 양호 ${okC}</div>
@@ -1346,10 +1368,113 @@ function showResult(okC,partC,ngC,naC,emails,success){
       <div class="stat-chip chip-ng">X 불량 ${ngC}</div>
       <div class="stat-chip chip-na">- ${naC}</div>
     </div>`;
-  document.getElementById('emailSentList').innerHTML=emails.map(e=>`${success?'✓':'?'} ${e}`).join('<br>');
 }
 
-// ── 리마인더 ─────────────────────────────────────────────────────────
+// ── 대시보드 ─────────────────────────────────────────────────────────
+function showDashboard(){
+  // 기본 기간: 최근 30일
+  const today = new Date();
+  const prior = new Date(); prior.setDate(today.getDate()-30);
+  document.getElementById('dashStart').value = prior.toISOString().slice(0,10);
+  document.getElementById('dashEnd').value   = today.toISOString().slice(0,10);
+
+  document.querySelectorAll('.step-screen').forEach(el=>el.classList.remove('active'));
+  document.getElementById('stepDash').classList.add('active');
+  window.scrollTo(0,0);
+  loadDashboard();
+}
+
+async function loadDashboard(){
+  const start = document.getElementById('dashStart').value;
+  const end   = document.getElementById('dashEnd').value;
+  if(!start||!end){ alert('기간을 설정해주세요.'); return; }
+
+  document.getElementById('dashLoading').style.display='block';
+  document.getElementById('dashContent').style.display='none';
+
+  try{
+    const url = APPS_SCRIPT_URL + '?action=getData&start='+start+'&end='+end;
+    const res  = await fetch(url);
+    const data = await res.json();
+    renderDashboard(data, start, end);
+  }catch(e){
+    document.getElementById('dashLoading').style.display='none';
+    document.getElementById('dashContent').style.display='block';
+    document.getElementById('dashTodayShift').innerHTML=
+      '<div style="font-size:13px;color:var(--text2);">데이터를 불러올 수 없습니다.<br>Apps Script를 재배포했는지 확인해주세요.</div>';
+  }
+}
+
+function renderDashboard(data, start, end){
+  document.getElementById('dashLoading').style.display='none';
+  document.getElementById('dashContent').style.display='block';
+
+  const rows = data.rows || [];
+  const today = new Date().toLocaleDateString('ko-KR').replace(/\. /g,'-').replace('.','-').slice(0,-1);
+
+  // ① 오늘 참여조
+  const todayRows = rows.filter(r=>r.date && r.date.includes(new Date().toLocaleDateString('ko-KR').split('.')[0].trim()));
+  const todayShifts = [...new Set(todayRows.map(r=>r.shift))].filter(Boolean);
+  const shiftEl = document.getElementById('dashTodayShift');
+  if(todayShifts.length===0){
+    shiftEl.innerHTML='<div style="font-size:13px;color:var(--text2);padding:12px;background:var(--surface2);border-radius:10px;">오늘 점검 기록 없음</div>';
+  } else {
+    shiftEl.innerHTML=todayShifts.map(s=>`
+      <div style="display:inline-block;background:rgba(245,166,35,0.15);border:1px solid var(--accent);border-radius:20px;padding:6px 16px;margin:4px;font-size:14px;font-weight:700;color:var(--accent);">${s}</div>
+    `).join('');
+  }
+
+  // ② 조별 참여 횟수
+  const shiftCount = {A:0,B:0,C:0,D:0};
+  rows.forEach(r=>{ if(r.shift && shiftCount[r.shift]!==undefined) shiftCount[r.shift]++; });
+  const total = rows.length;
+  document.getElementById('dashShiftCount').innerHTML=`
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+      ${['A','B','C','D'].map(s=>`
+        <div style="background:var(--surface2);border-radius:10px;padding:14px;text-align:center;">
+          <div style="font-size:22px;font-weight:700;color:var(--accent);">${shiftCount[s]}</div>
+          <div style="font-size:12px;color:var(--text2);">${s}조</div>
+        </div>`).join('')}
+    </div>
+    <div style="text-align:center;font-size:12px;color:var(--text2);">총 ${total}회 점검 (${start} ~ ${end})</div>
+  `;
+
+  // ③ 보완·불량 항목
+  const ngMap = {};
+  rows.forEach(r=>{
+    if(r.ngDetail && r.ngDetail!=='없음'){
+      r.ngDetail.split('\n').forEach(line=>{
+        const m = line.match(/\[([X△])\]\s*(.+)/);
+        if(m){
+          const key = m[2].trim();
+          if(!ngMap[key]) ngMap[key]={X:0,'△':0};
+          ngMap[key][m[1]]++;
+        }
+      });
+    }
+  });
+  const ngKeys = Object.keys(ngMap);
+  document.getElementById('dashNgItems').innerHTML = ngKeys.length===0
+    ? '<div style="font-size:13px;color:var(--green);padding:12px;background:rgba(34,197,94,0.1);border-radius:10px;">보완·불량 항목 없음 ✅</div>'
+    : ngKeys.map(k=>`
+      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:8px;">
+        <div style="font-size:13px;color:var(--text);margin-bottom:6px;">${k}</div>
+        <div style="display:flex;gap:8px;">
+          ${ngMap[k]['X']>0?`<span style="background:rgba(239,68,68,0.15);color:var(--red);border:1px solid rgba(239,68,68,0.3);border-radius:12px;padding:3px 10px;font-size:12px;font-weight:700;">X 불량 ${ngMap[k]['X']}회</span>`:''}
+          ${ngMap[k]['△']>0?`<span style="background:rgba(245,158,11,0.15);color:var(--yellow);border:1px solid rgba(245,158,11,0.3);border-radius:12px;padding:3px 10px;font-size:12px;font-weight:700;">△ 보완 ${ngMap[k]['△']}회</span>`:''}
+        </div>
+      </div>`).join('');
+
+  // ④ 특이사항
+  const memos = rows.filter(r=>r.memo&&r.memo!=='없음').map(r=>({date:r.date,shift:r.shift,memo:r.memo}));
+  document.getElementById('dashMemo').innerHTML = memos.length===0
+    ? '<div style="font-size:13px;color:var(--text2);padding:12px;background:var(--surface2);border-radius:10px;">특이사항 없음</div>'
+    : memos.map(m=>`
+      <div style="background:var(--surface2);border-radius:10px;padding:12px 14px;margin-bottom:8px;">
+        <div style="font-size:11px;color:var(--text2);margin-bottom:4px;">${m.date} · ${m.shift}</div>
+        <div style="font-size:13px;color:var(--text);">${m.memo}</div>
+      </div>`).join('');
+}
 function startReminder(){ stopReminder(); }
 function stopReminder(){if(reminderTimer){clearInterval(reminderTimer);reminderTimer=null;}}
 window.addEventListener('beforeunload',e=>{if(state.turn&&!state.submitted){e.preventDefault();e.returnValue='점검이 완료되지 않았습니다.';}});
