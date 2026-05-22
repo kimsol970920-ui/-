@@ -464,15 +464,6 @@ const QR_LOCATIONS = [
   {id:'3F_10', floor:'3층',   name:'10호기 스몰케미칼 투입구 옆',    formUrl:null},
   {id:'3F_13', floor:'3층',   name:'13호기 스몰케미칼 투입구 옆',    formUrl:null},
 ];
-  {id:'2F_06', floor:'2층',   name:'6호기 위그웨그 판넬 옆',        formUrl:null},
-  {id:'2F_09', floor:'2층',   name:'9호기 약품실 앞',               formUrl:null},
-  {id:'2F_13', floor:'2층',   name:'13호기 위그웨그 앞',            formUrl:null},
-  {id:'2F_MW', floor:'2층',   name:'마이크로웨이브 4호기 측면',      formUrl:null},
-  {id:'3F_03', floor:'3층',   name:'3호기 빅케미칼 투입구',          formUrl:null},
-  {id:'3F_06', floor:'3층',   name:'6호기 레진 투입구 앞',           formUrl:null},
-  {id:'3F_10', floor:'3층',   name:'10호기 스몰케미칼 투입구 옆',    formUrl:null},
-  {id:'3F_13', floor:'3층',   name:'13호기 스몰케미칼 투입구 옆',    formUrl:null},
-];
 
 // 교대별 점검 층 순환 (오전→1층, 오후→중2층, 야간→2층·3층 격일)
 // 날짜 기준 4일 주기로 층 순환
@@ -1361,8 +1352,8 @@ function renderSummary(){
     </div>
     ${state.memo?`<div class="sum-row"><span class="sum-label">기타 사항</span><span class="sum-value">${state.memo}</span></div>`:''}
   `;
-  document.getElementById('emailList').innerHTML=emails.map(e=>`📧 ${e}`).join('<br>');
 }
+
 
 // ── 제출 ─────────────────────────────────────────────────────────────
 async function submitResult(){
