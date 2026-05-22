@@ -748,7 +748,11 @@ function updateCommonProgress(){
   const total=COMMON_ITEMS.length;
   document.getElementById('prog2Text').textContent=`${done} / ${total} 항목 완료`;
   document.getElementById('prog2Bar').style.width=(done/total*100)+'%';
-  document.getElementById('step2Next').disabled=done<total;
+
+  // 중2층 QR 3개 모두 완료해야 다음 활성화
+  const m2Locs = QR_LOCATIONS.filter(l=>l.floor==='중2층');
+  const m2Done = m2Locs.every(l=>state.qrFormDone.has(l.id));
+  document.getElementById('step2Next').disabled = !(done>=total && m2Done);
 }
 
 // ── 교대별 체크리스트 렌더링 ─────────────────────────────────────────
@@ -837,7 +841,9 @@ function updateStep3Progress(){
 function checkStep3Ready(){
   const items=TURN_ITEMS[state.turn]||[];
   const turnDone=items.every(i=>state.checks[i.id]);
-  const qrDone=state.qrDone.size>0;
+  // 오늘 점검 구역의 모든 위치 QR 인증 완료해야 활성화
+  const todayLocs=getFloorLocations(state.todayFloor||'1층');
+  const qrDone=todayLocs.length>0 && todayLocs.every(l=>state.qrDone.has(l.id));
   const btn=document.getElementById('step3Next');
   if(btn) btn.disabled=!(turnDone&&qrDone);
 }
@@ -903,19 +909,50 @@ async function stopLocScan(locId){
 
 function onLocScanned(locId, scanned){
   stopLocScan(locId);
+
+  const m2Ids = QR_LOCATIONS.filter(l=>l.floor==='중2층').map(l=>l.id);
+  const isM2Location = m2Ids.includes(locId);
+
   if(scanned.includes('docs.google.com/forms')){
     const cleanUrl = scanned.split('?')[0];
     const matched = QR_LOCATIONS.find(l=>l.formUrl && l.formUrl.split('?')[0]===cleanUrl);
-    if(matched){ showFormModal(matched); return; }
+    if(matched){
+      if(matched.id !== locId){
+        const loc = QR_LOCATIONS.find(l=>l.id===locId);
+        alert(`⚠️ 해당 위치가 아닙니다.\n${loc?loc.name:'이 위치'}의 QR코드를 스캔해주세요.`);
+        return;
+      }
+      showFormModal(matched);
+      return;
+    }
+    if(isM2Location){
+      alert('⚠️ 중2층의 위치만 인식해주세요.\n(6호기 계단, 9호기 계단, 11호기 계단)');
+      return;
+    }
     window.location.href = scanned;
     return;
   }
+
   let lid = null;
   try{ lid = new URL(scanned).searchParams.get('loc'); }catch(_){}
   if(!lid) lid = scanned;
   const found = QR_LOCATIONS.find(l=>l.id===lid);
-  if(found) completeQRAuth(found.id);
-  else alert('⚠️ 등록되지 않은 QR코드입니다.');
+
+  if(found){
+    if(found.id !== locId){
+      const loc = QR_LOCATIONS.find(l=>l.id===locId);
+      alert(`⚠️ 해당 위치가 아닙니다.\n${loc?loc.name:'이 위치'}의 QR코드를 스캔해주세요.`);
+      return;
+    }
+    completeQRAuth(found.id);
+    renderM2LocList();
+  } else {
+    if(isM2Location){
+      alert('⚠️ 중2층의 위치만 인식해주세요.\n(6호기 계단, 9호기 계단, 11호기 계단)');
+    } else {
+      alert('⚠️ 등록되지 않은 QR코드입니다.');
+    }
+  }
 }
 
 function stopInlineQRScan2(){ for(const id in locScanners) stopLocScan(id); }
@@ -1246,7 +1283,7 @@ function completeQRAuth(locId){
   const loc=QR_LOCATIONS.find(l=>l.id===locId);
   state.qrDone.add(locId);
   if(loc && loc.formUrl) state.qrFormDone.add(locId);
-  if(loc && loc.formUrl) updateCommonProgress();
+  updateCommonProgress(); // 항상 STEP2 버튼 상태 갱신
   renderQRTab();
   renderM2LocList();
   renderM2DoneList();
@@ -1413,7 +1450,8 @@ function renderDashboard(data, start, end){
   const today = new Date().toLocaleDateString('ko-KR').replace(/\. /g,'-').replace('.','-').slice(0,-1);
 
   // ① 오늘 참여조
-  const todayRows = rows.filter(r=>r.date && r.date.includes(new Date().toLocaleDateString('ko-KR').split('.')[0].trim()));
+  const todayStr = new Date().toISOString().slice(0,10); // YYYY-MM-DD
+  const todayRows = rows.filter(r=>r.date && r.date.startsWith(todayStr.slice(0,10).replace(/-/g,'-')));
   const todayShifts = [...new Set(todayRows.map(r=>r.shift))].filter(Boolean);
   const shiftEl = document.getElementById('dashTodayShift');
   if(todayShifts.length===0){
