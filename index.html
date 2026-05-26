@@ -537,9 +537,6 @@ function renderFloorMap(floor) {
   el.style.display='block';
   el.innerHTML = block;
 }
-  el.style.display='block';
-  el.innerHTML = block;
-}
 
 // ── QR 위치 데이터 ────────────────────────────────────────────────────
 // 중2층: formUrl 있음 → QR 스캔 후 구글폼 작성 필요
@@ -572,9 +569,9 @@ function getTodayFloor(turn) {
   // 주기: 0→오전1층/오후중2층/야간2층, 1→오전중2층/오후2층/야간3층,
   //       2→오전2층/오후3층/야간1층, 3→오전3층/오후1층/야간중2층
   const cycle = {
-    '전': ['1층','중2층','2층','3층'],
-    '후': ['중2층','2층','3층','1층'],
-    '야': ['2층','3층','1층','중2층'],
+    '오전': ['1층','중2층','2층','3층'],
+    '오후': ['중2층','2층','3층','1층'],
+    '야간': ['2층','3층','1층','중2층'],
   };
   return cycle[turn]?.[dayIdx] || '1층';
 }
@@ -602,7 +599,7 @@ const COMMON_ITEMS = [
 ];
 
 const TURN_ITEMS = {
-  '전': [
+  '오전': [
     {id:'m01', text:'조도, 작업 발판 등의 이상유무'},
     {id:'m02', text:'소화전·소화기 전방 1m 이내 장애물 비치 여부'},
     {id:'m03', text:'화물용 승강기·컨베이어 탑승 여부 및 낙하 위험 여부'},
@@ -610,14 +607,14 @@ const TURN_ITEMS = {
     {id:'m05', text:'리프트 방호장치 (과부하·비상정지·권과 방지 장치) 이상유무'},
     {id:'m06', text:'밀폐공간 출입 작업 시 감시인 배치 및 작업방법 주지'},
   ],
-  '후': [
+  '오후': [
     {id:'a01', text:'기름걸레·기름묻은 장갑 뚜껑 있는 철제용기에 분리 배출'},
     {id:'a02', text:'구급함 관리 상태 확인 및 사용법 주지'},
     {id:'a03', text:'크레인·호이스트 후크·해지장치·체인·와이어 없음 또는 변형 여부'},
     {id:'a04', text:'크레인·호이스트 경고표지 부착 여부 및 하중 초과 사용 여부'},
     {id:'a05', text:'선풍기 날개·프레임 등에 손가락 접촉 위험 여부'},
   ],
-  '야': [
+  '야간': [
     {id:'n01', text:'조도, 작업발판 등의 이상유무'},
     {id:'n02', text:'소화전·소화기 월간 점검 실시 여부'},
     {id:'n03', text:'컨베이어 탑승 금지 여부 및 낙하 위험 여부'},
@@ -631,7 +628,7 @@ const TURN_ITEMS = {
 // ── 상태 ──────────────────────────────────────────────────────────────
 let state = {
   shift:null, turn:null,
-  gpsLat:null, gpsLng:null, gpsAccuracy:null, gpsOk:false,
+  gpsLat:null, gpsLng:null, gpsAccuracy:null, gpsOk:true, // GPS 비활성화
   checks:{}, ngMemos:{}, memo:'',
   timestamp:null, submitted:false,
   todayFloor:null,
